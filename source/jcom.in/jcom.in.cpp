@@ -265,6 +265,7 @@ void WrappedInputClass_free(TTPtr self)
 void in_subscribe(TTPtr self)
 {
 	WrappedModularInstancePtr x = (WrappedModularInstancePtr)self;
+    TTAddress   signalAddress;
 	TTAddress   inputAddress;
 	TTAddress   outputAddress;
 	TTValue		v, args;
@@ -274,9 +275,16 @@ void in_subscribe(TTPtr self)
 	TTDataPtr	aData;
 	TTString	formatDescription, sInstance;
 	SymbolPtr	inDescription;
-	
-	inputAddress = TTAddress("in").appendInstance(EXTRA->instance);
-	
+
+#ifdef JCOM_IN_TILDE
+	signalAddress = TTAddress("audio");
+#else
+    signalAddress = TTAddress("flow");
+#endif
+    
+    // edit "signal/in.instance" address
+    inputAddress = signalAddress.appendAddress(TTAddress("in")).appendInstance(EXTRA->instance);
+    
 	// if the subscription is successful
 	if (!jamoma_subscriber_create((ObjectPtr)x, x->wrappedObject, inputAddress, &x->subscriberObject, returnedAddress, &returnedNode, &returnedContextNode)) {
 		
@@ -290,10 +298,36 @@ void in_subscribe(TTPtr self)
 		returnedNode->getParent()->getAddress(parentAddress);
 		outputAddress = parentAddress.appendAddress(TTAddress("out")).appendInstance(EXTRA->instance);
 		x->wrappedObject->setAttributeValue(TTSymbol("outputAddress"), outputAddress);
+        
+        // TODO : move this inside jcom.model (which have to listen any signal node creation/destruction)
+/*
+        // make internal parameter at signal/amplitude/active address
+		makeInternals_data(x, parentAddress, TTSymbol("amplitude/active"), gensym("return_amplitude_active"), x->patcherPtr, kTTSym_parameter, (TTObjectBasePtr*)&aData);
+		aData->setAttributeValue(kTTSym_type, kTTSym_integer);
+		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
+		v = TTValue((int)EXTRA->pollInterval);
+		aData->setAttributeValue(kTTSym_valueDefault, v);
+		v = TTValue(0, 1000);
+		aData->setAttributeValue(kTTSym_rangeBounds, v);
+		aData->setAttributeValue(kTTSym_rangeClipmode, kTTSym_low);
+		aData->setAttributeValue(kTTSym_description, TTSymbol("set the sample rate of the amplitude follower"));
+        
+        // make internal parameter at signal/mute address
+        makeInternals_data(x, parentAddress, TTSymbol("mute"), gensym("return_mute"), x->patcherPtr, kTTSym_parameter, (TTObjectBasePtr*)&aData);
+		aData->setAttributeValue(kTTSym_type, kTTSym_boolean);
+		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
+		aData->setAttributeValue(kTTSym_description, TTSymbol("When active, this parameter turns off model's audio processing"));
+        
+        // make internal parameter at signal/mute address
+        makeInternals_data(x, parentAddress, TTSymbol("bypass"), gensym("return_bypass"), x->patcherPtr, kTTSym_parameter, (TTObjectBasePtr*)&aData);
+		aData->setAttributeValue(kTTSym_type, kTTSym_boolean);
+		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
+		aData->setAttributeValue(kTTSym_description, TTSymbol("When active, this parameter bypasses the model's processing algtorithm, letting incoming signal pass through unaffected"));
+ */
 		
 #ifdef JCOM_IN_TILDE
 		
-		// make internal data to return amplitude
+		// make internal return at signal/in.instance/amplitude
 		v = TTValue(0., 1.);
 		formatDescription = "instant amplitude of %s input";
 		
@@ -308,38 +342,12 @@ void in_subscribe(TTPtr self)
 		aData->setAttributeValue(kTTSym_dataspace, TTSymbol("gain"));
 		aData->setAttributeValue(kTTSym_dataspaceUnit, TTSymbol("linear"));
 		
-		// make internal data to parameter in/amplitude/active
-		makeInternals_data(x, returnedAddress, TTSymbol("amplitude/active"), gensym("return_amplitude_active"), x->patcherPtr, kTTSym_parameter, (TTObjectBasePtr*)&aData);
-		aData->setAttributeValue(kTTSym_type, kTTSym_integer);
-		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
-		v = TTValue((int)EXTRA->pollInterval);
-		aData->setAttributeValue(kTTSym_valueDefault, v);
-		v = TTValue(0, 1000);
-		aData->setAttributeValue(kTTSym_rangeBounds, v);
-		aData->setAttributeValue(kTTSym_rangeClipmode, kTTSym_low);
-		aData->setAttributeValue(kTTSym_description, TTSymbol("set the sample rate of the amplitude follower"));
-		
 		// launch the clock to update amplitude regulary
 		EXTRA->clock = clock_new(x, (method)in_update_amplitude);
 		if (EXTRA->pollInterval)
 			clock_delay(EXTRA->clock, EXTRA->pollInterval);
 		
 #endif
-		
-		// expose bypass and mute attributes of TTInput as TTData in the tree structure
-		x->subscriberObject->exposeAttribute(x->wrappedObject, kTTSym_bypass, kTTSym_parameter, &aData);
-		aData->setAttributeValue(kTTSym_type, kTTSym_boolean);
-		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
-		aData->setAttributeValue(kTTSym_description, TTSymbol("When active, this attribute bypasses the model's processing algtorithm, letting incoming signal pass through unaffected"));
-		v = TTValue(0);
-		aData->setAttributeValue(kTTSym_valueDefault, v);			
-		
-		x->subscriberObject->exposeAttribute(x->wrappedObject, kTTSym_mute, kTTSym_parameter, &aData);
-		aData->setAttributeValue(kTTSym_type, kTTSym_boolean);
-		aData->setAttributeValue(kTTSym_tag, kTTSym_generic);
-		aData->setAttributeValue(kTTSym_description, TTSymbol("When active, this attribute turns off model's inputs."));
-		v = TTValue(0);
-		aData->setAttributeValue(kTTSym_valueDefault, v);
 	}
 }
 
